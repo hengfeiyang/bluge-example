@@ -8,7 +8,7 @@ import (
 	"github.com/blugelabs/bluge"
 )
 
-func loadData(writer *bluge.Writer) error {
+func Creates(writer *bluge.Writer) error {
 	datas := []map[string]interface{}{
 		{"_id": "a", "category": "inventory", "type": "book", "updated": time.Now(), "rating": 1},
 		{"_id": "b", "category": "inventory", "type": "book", "updated": time.Now(), "rating": 2},

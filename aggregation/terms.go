@@ -3,7 +3,7 @@ package aggregation
 import (
 	"context"
 	"fmt"
-	"log"
+	"time"
 
 	"github.com/blugelabs/bluge"
 	"github.com/blugelabs/bluge/search"
@@ -11,39 +11,43 @@ import (
 	"github.com/safeie/bluge-example/aggregation/custom"
 )
 
-func terms() {
-	cfg := bluge.DefaultConfig("../data/myindex")
-	writer, err := bluge.OpenWriter(cfg)
-	if err != nil {
-		log.Fatal(err)
-	}
-	// err = loadData(writer)
-	// err = searchQuery(writer)
-	err = searchAggs(writer)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	writer.Close()
-}
-
-func searchAggs(writer *bluge.Writer) error {
+func Terms(writer *bluge.Writer) error {
 	reader, err := writer.Reader()
 	if err != nil {
 		return err
 	}
 	query := bluge.NewBooleanQuery().AddMust(bluge.NewMatchAllQuery())
 	searchRequest := bluge.NewTopNSearch(1, query).WithStandardAggregations()
+
+	// term
 	termAgg := custom.NewTermsAggregation(search.Field("type"), custom.TextValueSource, 100)
 	termAgg.AddAggregation("sub-term1", custom.NewTermsAggregation(search.Field("type"), custom.TextValueSource, 100))
 	termAgg.AddAggregation("sub-term2", custom.NewTermsAggregation(search.Field("category"), custom.TextValueSource, 100))
 	termAgg.AddAggregation("sub-term3", custom.NewTermsAggregation(search.Field("rating"), custom.NumericValuesSource, 100))
 	searchRequest.AddAggregation("my-agg-term", termAgg)
+
+	// range
+	rangeAgg := aggregations.Ranges(search.Field("rating"))
+	rangeAgg.AddRange((*aggregations.NumericRange)(aggregations.Range(0, 5)))
+	rangeAgg.AddRange((*aggregations.NumericRange)(aggregations.Range(5, 10)))
+	searchRequest.AddAggregation("my-agg-range", rangeAgg)
+
+	// date range
+	timestampAggregation := aggregations.DateRanges(search.Field("updated"))
+	daterange1 := aggregations.NewDateRange(time.Now().Add(-time.Hour*2*30), time.Now().Add(-time.Hour*1*30))
+	timestampAggregation.AddRange(daterange1)
+	daterange2 := aggregations.NewDateRange(time.Now().Add(-time.Hour*1*30), time.Now())
+	timestampAggregation.AddRange(daterange2)
+	searchRequest.AddAggregation("my-agg-date", timestampAggregation)
+
+	// metrics
 	searchRequest.AddAggregation("my-agg-card", aggregations.Cardinality(search.Field("category")))
 	searchRequest.AddAggregation("my-agg-max", aggregations.Max(search.Field("rating")))
 	searchRequest.AddAggregation("my-agg-min", aggregations.Min(search.Field("rating")))
 	searchRequest.AddAggregation("my-agg-avg", aggregations.Avg(search.Field("rating")))
 	searchRequest.AddAggregation("my-agg-sum", aggregations.Sum(search.Field("rating")))
+	searchRequest.AddAggregation("my-agg-count", aggregations.CountMatches())
+
 	dmi, err := reader.Search(context.Background(), searchRequest)
 	if err != nil {
 		return err
@@ -85,5 +89,4 @@ func searchAggs(writer *bluge.Writer) error {
 	fmt.Printf("total: %d, times: %d, err: %v\n\n", total, times, err)
 
 	return nil
-
 }
